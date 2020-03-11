@@ -1,0 +1,29 @@
+version: '3.1'
+services:
+  scripts:
+    build: script
+    restart: "no"
+    volumes:
+      - ./script:/app
+      - ./original_data/:/data
+    links:
+      - db:db
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/postgres?sslmode=disable
+  db:
+    image: postgres
+    restart: always
+    volumes:
+      - db-data:/var/lib/postgresql/data
+  pgweb:
+    restart: always
+    image: sosedoff/pgweb
+    ports:
+      - "8081:8081"
+    links:
+      - db:db
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/postgres?sslmode=disable
+volumes:
+  db-data:
+    driver: local

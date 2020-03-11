@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+docker-compose run scripts bundle exec ruby init.rb
