@@ -24,6 +24,14 @@ CREATE TABLE trips
   user_type VARCHAR(100) NOT NULL,
   original_filename VARCHAR(100) NOT NULL
 );
+
+DROP TABLE IF EXISTS stations;
+CREATE TABLE stations
+(
+  id INT NOT NULL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL
+);
+
 SQL
 
 
