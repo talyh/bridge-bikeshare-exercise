@@ -12,7 +12,6 @@ You will need Docker / Docker Compose for this to work
 
 
 ## Initializing the Database
-
 The first thing you're going to want to do is iniitalize the database
 
 ```bash
@@ -46,6 +45,17 @@ For console try
 
 ``` bash
 ./bin/psql
+```
+
+# Tips
+
+1) Take good notes on the queries you're running and what you're seeing!
+2) Don't forget to add `LIMIT 10` to your exploratory queries so you don't overload the database. Take it off when you're ready to go!
+2) If you want to make a backup, try
+
+``` sql
+CREATE TABLE trips_backup AS 
+TABLE trips;
 ```
 
 ## Starting Over
