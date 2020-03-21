@@ -16,20 +16,20 @@
 
    2. Delete the exist `stations` table and recreate it with serial ids, so we can rely on auto-increment. (We could try and alter the table, but that seems to be an involved process, and our table being currently empty, it's easier to just recreate it)
 
-   ```
-   DROP TABLE stations;
-   ```
+      ```
+      DROP TABLE stations;
+      ```
 
-   ```
-   CREATE TABLE stations
-   (
-      id SERIAL,
-      name VARCHAR(100)
-   );
-   ```
+      ```
+      CREATE TABLE stations
+      (
+         id SERIAL,
+         name VARCHAR(100)
+      );
+      ```
 
-   The effect of this can be perceived by running `SELECT nextval(pg_get_serial_sequence('stations', 'id'));`.
-   On the old table, that sequence, though present, wouldn't return a value. Now it does.
+      The effect of this can be perceived by running `SELECT nextval(pg_get_serial_sequence('stations', 'id'));`.
+      On the old table, that sequence, though present, wouldn't return a value. Now it does.
 
    3. Get the first name for stations, assuming that as the correct one where there's more than one, combining the `from` and `to` column results
 
@@ -127,39 +127,62 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
 # Part 2: Missing Date Data
 
-1. _**What's the inconsistency in date formats? You can assume that each quarter's trips are numbered sequentially, starting with the first day of the first month of that quarter.**_
+1.  _**What's the inconsistency in date formats? You can assume that each quarter's trips are numbered sequentially, starting with the first day of the first month of that quarter.**_
 
-   There are many. We can examine them by running (this uses the fairly safe assumption of consistency within each of the original csv, so looking at the first record for a given file provides insight into the whole file).
+    There are many. We can examine them by running (this uses the fairly safe assumption of consistency within each of the original csv, so looking at the first record for a given file provides insight into the whole file).
 
-   ```
-   SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
-   FROM trips
-   GROUP BY original_filename;
-   ```
+    ```
+    SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
+    FROM trips
+    GROUP BY original_filename;
+    ```
 
-   It gets us the result
+    It gets us the result
 
-   ```
-   original_filename             |     array_agg
-   ------------------------------------------+-------------------
-   Bikeshare Ridership (2017 Q1).csv        | 10/1/2017 0:03
-   Bikeshare Ridership (2017 Q2).csv        | 10/4/2017 0:00
-   Bikeshare Ridership (2017 Q3).csv        | 7/10/2017 0:00
-   Bikeshare Ridership (2017 Q4).csv        | 10/01/17 00:00:01
-   Bike Share Toronto Ridership_Q1 2018.csv | 1/10/2018 0:01
-   Bike Share Toronto Ridership_Q2 2018.csv | 4/10/2018 0:01
-   Bike Share Toronto Ridership_Q3 2018.csv | 7/10/2018 0:00
-   Bike Share Toronto Ridership_Q4 2018.csv | 10/10/2018 0:01
-   ```
+    ```
+    original_filename             |     array_agg
+    ------------------------------------------+-------------------
+    Bikeshare Ridership (2017 Q1).csv        | 10/1/2017 0:03
+    Bikeshare Ridership (2017 Q2).csv        | 10/4/2017 0:00
+    Bikeshare Ridership (2017 Q3).csv        | 7/10/2017 0:00
+    Bikeshare Ridership (2017 Q4).csv        | 10/01/17 00:00:01
+    Bike Share Toronto Ridership_Q1 2018.csv | 1/10/2018 0:01
+    Bike Share Toronto Ridership_Q2 2018.csv | 4/10/2018 0:01
+    Bike Share Toronto Ridership_Q3 2018.csv | 7/10/2018 0:00
+    Bike Share Toronto Ridership_Q4 2018.csv | 10/10/2018 0:01
+    ```
 
-   We can see there that:
+    We can see there that:
 
-   - Throughout 2017 there's no consistency in using `dd/mm` and `mm/dd`. The first 2 quarters use `dd/mm`, while the last 2 use `mm/dd`.
-   - Further, throughout 2017 there's no consistency in using `yy` and `yyyy`. The first 3 quarters use the full year, while the last one uses short year.
-   - Time format is also inconsistent throughout 2017, with the first 3 quarters using `h:mm`, while the last one uses `hh:mm:ss`
-   - 2018 was a beautiful year for date formating in the bike share organization
+    - Throughout 2017 there's no consistency in using `dd/mm` and `mm/dd`. The first 2 quarters use `dd/m`, while the last 2 use `m/dd`.
+    - Further, throughout 2017 there's no consistency in using `yy` and `yyyy`. The first 3 quarters use the full year, while the last one uses short year.
+    - Time format is also inconsistent throughout 2017, with the first 3 quarters using `h:mm`, while the last one uses `hh:mm:ss`
+    - 2018 was a beautiful year for date formating in the bike share organization
 
-2. _**Take a look at Postgres's [date functions](https://www.postgresql.org/docs/12/functions-datetime.html), and fill in the missing date data using proper timestamps. You may have to write several queries to do this.**_
+2.  _**Take a look at Postgres's [date functions](https://www.postgresql.org/docs/12/functions-datetime.html), and fill in the missing date data using proper timestamps. You may have to write several queries to do this.**_
+
+    TBD
+
+    Our final goal is to get all dates to be in the format used throughout 2018 files, which is `mm/dd/yyyy h:mm`.
+
+    Treat each quarter separately
+
+    _For 2017-Q1 - 10/1/2017 0:03_
+
+    - switch `dd/m` to `mm/dd`
+
+    _For 2017-Q2 - 10/4/2017 0:00_
+
+    - switch `dd/m` to `mm/dd`
+
+    _For 2017-Q3 - 7/10/2017 0:00_
+
+    - switch `m/dd` to `mm/dd`
+
+    _For 2017-Q4 - 10/01/17 00:00:01_
+
+    - switch `yy` to `yyyy`
+    - switch `hh:mm:ss` to `h:mm`
 
 3) _**Other than the index in class, would we benefit from any other indexes on this table? Why or why not?**_
 
@@ -206,7 +229,21 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 # Part 3: Data-driven insights
 
 1. _**Build a mini-report that does a breakdown of number of trips by month**_
+
+   TBD
+
 2. _**Build a mini-report that does a breakdown of number trips by time of day of their start and end times**_
+
+   TBD
+
 3. _**What are the most popular stations to bike to in the summer?**_
+
+   TBD
+
 4. _**What are the most popular stations to bike from in the winter?**_
+
+   TBD
+
 5. _**Come up with a question that's interesting to you about this data that hasn't been asked and answer it.**_
+
+   TBD
