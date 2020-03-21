@@ -1,6 +1,6 @@
 # Part 1: Missing Station Data
 
-1. Write a query that fills out this table. Try your best to pick the correct station name for each ID. You may have to make some manual choices or editing based on the inconsistencies we've found. Do try to pick the correct name for each station ID based on how popular it is in the trip data.
+1. _**Write a query that fills out this table. Try your best to pick the correct station name for each ID. You may have to make some manual choices or editing based on the inconsistencies we've found. Do try to pick the correct name for each station ID based on how popular it is in the trip data.**_
 
    ### Steps
 
@@ -90,11 +90,11 @@
       );
       ```
 
-2) Should we add any indexes to the stations table, why or why not?
+2. _**Should we add any indexes to the stations table, why or why not?**_
 
    Not right now. We already have an index on `id`, because it's the table's pkey. For our current usage, that should suffice.
 
-3) Fill in the missing data in the `trips` table based on the work you did above
+3. _**Fill in the missing data in the `trips` table based on the work you did above**_
 
    ### Steps
 
@@ -127,16 +127,86 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
 # Part 2: Missing Date Data
 
-1. What's the inconsistency in date formats? You can assume that each quarter's trips are numbered sequentially, starting with the first day of the first month of that quarter.
+1. _**What's the inconsistency in date formats? You can assume that each quarter's trips are numbered sequentially, starting with the first day of the first month of that quarter.**_
 
-2. Take a look at Postgres's [date functions](https://www.postgresql.org/docs/12/functions-datetime.html), and fill in the missing date data using proper timestamps. You may have to write several queries to do this.
+   There are many. We can examine them by running (this uses the fairly safe assumption of consistency within each of the original csv, so looking at the first record for a given file provides insight into the whole file).
 
-3. Other than the index in class, would we benefit from any other indexes on this table? Why or why not?
+   ```
+   SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
+   FROM trips
+   GROUP BY original_filename;
+   ```
+
+   It gets us the result
+
+   ```
+   original_filename             |     array_agg
+   ------------------------------------------+-------------------
+   Bikeshare Ridership (2017 Q1).csv        | 10/1/2017 0:03
+   Bikeshare Ridership (2017 Q2).csv        | 10/4/2017 0:00
+   Bikeshare Ridership (2017 Q3).csv        | 7/10/2017 0:00
+   Bikeshare Ridership (2017 Q4).csv        | 10/01/17 00:00:01
+   Bike Share Toronto Ridership_Q1 2018.csv | 1/10/2018 0:01
+   Bike Share Toronto Ridership_Q2 2018.csv | 4/10/2018 0:01
+   Bike Share Toronto Ridership_Q3 2018.csv | 7/10/2018 0:00
+   Bike Share Toronto Ridership_Q4 2018.csv | 10/10/2018 0:01
+   ```
+
+   We can see there that:
+
+   - Throughout 2017 there's no consistency in using `dd/mm` and `mm/dd`. The first 2 quarters use `dd/mm`, while the last 2 use `mm/dd`.
+   - Further, throughout 2017 there's no consistency in using `yy` and `yyyy`. The first 3 quarters use the full year, while the last one uses short year.
+   - Time format is also inconsistent throughout 2017, with the first 3 quarters using `h:mm`, while the last one uses `hh:mm:ss`
+   - 2018 was a beautiful year for date formating in the bike share organization
+
+2. _**Take a look at Postgres's [date functions](https://www.postgresql.org/docs/12/functions-datetime.html), and fill in the missing date data using proper timestamps. You may have to write several queries to do this.**_
+
+3) _**Other than the index in class, would we benefit from any other indexes on this table? Why or why not?**_
+
+   Yes. An index on `original_filename` goes a long way here.
+   It can be perceived by the following, observing the different `cost` before and after the index:
+
+   ```
+   postgres=# EXPLAIN SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
+   FROM trips
+   GROUP BY original_filename;
+   QUERY PLAN
+   ----------------------------------------------------------------
+   GroupAggregate  (cost=719052.22..744667.25 rows=8 width=69)
+      Group Key: original_filename
+      ->  Sort  (cost=719052.22..727590.53 rows=3415324 width=52)
+            Sort Key: original_filename
+            ->  Seq Scan on trips  (cost=0.00..114957.24 rows=3415324 width=52)
+   JIT:
+      Functions: 7
+      Options: Inlining true, Optimization true, Expressions true, Deforming true
+   (8 rows)
+   ```
+
+   ```
+   postgres=# CREATE INDEX idx_original_filename ON trips USING btree (original_filename);
+   CREATE INDEX
+   ```
+
+   ```
+   postgres=# EXPLAIN SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
+      FROM trips
+      GROUP BY original_filename;
+   QUERY PLAN
+   ----------------------------------------------------------------
+   GroupAggregate  (cost=0.56..343851.30 rows=8 width=69)
+      Group Key: original_filename
+      ->  Index Scan using idx_original_filename on trips  (cost=0.56..326774.58 rows=3415324 width=52)
+   JIT:
+      Functions: 5
+      Options: Inlining false, Optimization false, Expressions true, Deforming true
+   (6 rows)
+   ```
 
 # Part 3: Data-driven insights
 
-1. Build a mini-report that does a breakdown of number of trips by month
-2. Build a mini-report that does a breakdown of number trips by time of day of their start and end times
-3. What are the most popular stations to bike to in the summer?
-4. What are the most popular stations to bike from in the winter?
-5. Come up with a question that's interesting to you about this data that hasn't been asked and answer it.
+1. _**Build a mini-report that does a breakdown of number of trips by month**_
+2. _**Build a mini-report that does a breakdown of number trips by time of day of their start and end times**_
+3. _**What are the most popular stations to bike to in the summer?**_
+4. _**What are the most popular stations to bike from in the winter?**_
+5. _**Come up with a question that's interesting to you about this data that hasn't been asked and answer it.**_
