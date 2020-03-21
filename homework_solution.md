@@ -100,28 +100,28 @@
 
    1. We _could_ update the names in `trips`, like so:
 
-   ```
-   UPDATE trips t
-   SET from_station_name = (SELECT name FROM stations s WHERE t.from_station_id = s.id),
-      to_station_name = (SELECT name FROM stations s WHERE t.from_station_id = s.id)
-   ```
+      ```
+      UPDATE trips t
+      SET from_station_name = (SELECT name FROM stations s WHERE t.from_station_id = s.id),
+         to_station_name = (SELECT name FROM stations s WHERE t.from_station_id = s.id)
+      ```
 
    2. However, it's best to just delete the station names column, so the `stations` table becomes the single source of truth for that
 
-   ```
-   ALTER TABLE trips_backup
-   DROP COLUMN from_station_name,
-   DROP COLUMN to_station_name;
-   ```
+      ```
+      ALTER TABLE trips_backup
+      DROP COLUMN from_station_name,
+      DROP COLUMN to_station_name;
+      ```
 
    3. Before doing that, we have to populate the station ids columns where they're null
 
-   ```
-   UPDATE trips t
-   SET from_station_id = (SELECT id FROM stations s WHERE t.from_station_name = s.name),
-    to_station_id  = (SELECT id FROM stations s WHERE t.to_station_name = s.name)
-   WHERE from_station_id IS NULL OR to_station_id IS NULL
-   ```
+      ```
+      UPDATE trips t
+      SET from_station_id = (SELECT id FROM stations s WHERE t.from_station_name = s.name),
+      to_station_id  = (SELECT id FROM stations s WHERE t.to_station_name = s.name)
+      WHERE from_station_id IS NULL OR to_station_id IS NULL
+      ```
 
 Now all of our `trips` should have stations ids that can be joined on the `stations` table when we need to get more information.
 
@@ -187,7 +187,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 3) _**Other than the index in class, would we benefit from any other indexes on this table? Why or why not?**_
 
    Yes. An index on `original_filename` goes a long way here.
-   It can be perceived by the following, observing the different `cost` before and after the index:
+   It can be perceived by the observing the different `cost` before and after the index:
 
    ```
    postgres=# EXPLAIN SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
