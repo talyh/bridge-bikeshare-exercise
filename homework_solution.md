@@ -227,7 +227,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
     5. Update `2018` records
        ```
-       UPDATE trips_backup
+       UPDATE trips
        SET
           start_time = (SELECT TO_TIMESTAMP(start_time_str, 'MM/DD/YYYY HH24:MI')),
           end_time = (SELECT TO_TIMESTAMP(end_time_str, 'MM/DD/YYYY HH24:MI'))
@@ -291,24 +291,184 @@ Options: Inlining false, Optimization false, Expressions true, Deforming true
 
 1. _**Build a mini-report that does a breakdown of number of trips by month**_
 
-TBD
+   ```
+   SELECT
+      CASE  EXTRACT (MONTH FROM start_time)
+         WHEN 1 THEN '01 - JAN'
+         WHEN 2 THEN '02 - FEB'
+         WHEN 3 THEN '03 - MAR'
+         WHEN 4 THEN '04 - APR'
+         WHEN 5 THEN '05 - MAY'
+         WHEN 6 THEN '06 - JUN'
+         WHEN 7 THEN '07 - JUL'
+         WHEN 8 THEN '08 - AUG'
+         WHEN 9 THEN '09 - SEP'
+         WHEN 10 THEN '10 - OCT'
+         WHEN 11 THEN '11 - NOV'
+         WHEN 12 THEN '12 - DEC'
+      END
+      AS Month,
+      COUNT(id) as Trips
+   FROM trips
+   GROUP BY Month
+   ORDER BY 1;
+   ```
+
+   This yields:
+
+   ```
+   month   | trips
+   ----------+--------
+   01 - JAN | 748661
+   02 - FEB |  91357
+   03 - MAR | 134152
+   04 - APR | 173809
+   05 - MAY | 317475
+   06 - JUN | 400439
+   07 - JUL | 286316
+   08 - AUG | 281219
+   09 - SEP | 255001
+   10 - OCT | 361455
+   11 - NOV | 223000
+   12 - DEC | 142440
+   ```
 
 2. _**Build a mini-report that does a breakdown of number trips by time of day of their start and end times**_
 
-TBD
+   ```
+   SELECT EXTRACT (HOUR FROM start_time) as Hour, COUNT(id) Trips
+   FROM trips
+   GROUP BY Hour
+   ORDER BY 1;
+   ```
+
+   This yields:
+
+   ```
+   hour | trips
+   ------+--------
+      0 |  51963
+      1 |  34881
+      2 |  25890
+      3 |  14971
+      4 |  10050
+      5 |  14605
+      6 |  35964
+      7 | 102293
+      8 | 262611
+      9 | 182866
+      10 | 116588
+      11 | 143002
+      12 | 195771
+      13 | 196422
+      14 | 178743
+      15 | 196403
+      16 | 270860
+      17 | 362711
+      18 | 279013
+      19 | 207960
+      20 | 173010
+      21 | 155357
+      22 | 119962
+      23 |  83428
+   ```
 
 3. _**What are the most popular stations to bike to in the summer?**_
 
-TBD
+   ```
+   SELECT s.name AS Station, COUNT(t.id) AS Trips
+   FROM stations s JOIN trips t
+      ON s.id = t.from_station_id
+   WHERE EXTRACT (MONTH FROM start_time) BETWEEN 7 AND 9
+   GROUP BY Station
+   ORDER BY Trips DESC
+   LIMIT 10;
+   ```
+
+   This yields:
+
+   ```
+
+                     station                    | trips
+   -----------------------------------------------+-------
+   York St / Queens Quay W                       | 12130
+   Bay St / Queens Quay W (Ferry Terminal)       | 11447
+   Bathurst St/Queens Quay(Billy Bishop Airport) |  8837
+   Lakeshore Blvd W / Ontario Dr                 |  8105
+   Front St W / Blue Jays Way                    |  7191
+   Queens Quay W / Lower Simcoe St               |  7041
+   Dockside Dr / Queens Quay E (Sugar Beach)     |  7041
+   Bay St / Wellesley St W                       |  7012
+   Union Station                                 |  7001
+   Queen St W / Portland St                      |  6955
+   ```
 
 4. _**What are the most popular stations to bike from in the winter?**_
 
-TBD
+   ```
+   SELECT s.name AS Station, COUNT(t.id) AS Trips
+   FROM stations s JOIN trips t
+      ON s.id = t.from_station_id
+   WHERE EXTRACT (MONTH FROM start_time) IN (12, 1, 2)
+   GROUP BY Station
+   ORDER BY Trips DESC
+   LIMIT 10;
+   ```
+
+   This yields:
+
+   ```
+                  station                 | trips
+   -----------------------------------------+-------
+   Union Station                           | 13764
+   York St / Queens Quay W                 | 12530
+   Dundas St W / Yonge St                  | 12379
+   Bay St / Wellesley St W                 | 11381
+   Bay St / College St (East Side)         | 11007
+   Queen St W / Portland St                | 10617
+   King St W / Spadina Ave                 | 10510
+   Front St W / Blue Jays Way              | 10403
+   Bay St / Queens Quay W (Ferry Terminal) | 10142
+   Ontario Place Blvd / Remembrance Dr     |  9751
+   ```
 
 5. _**Come up with a question that's interesting to you about this data that hasn't been asked and answer it.**_
 
-TBD
+   We'll take a look at popular stations to start a journey from, along Yonge St.
 
-```
+   ```
+   SELECT s.name AS Station, COUNT(t.id) AS Trips
+   FROM stations s JOIN trips_backup t
+      ON s.id = t.from_station_id
+   WHERE s.name LIKE '%Yonge%'
+   GROUP BY Station
+   ORDER BY Trips DESC
+   LIMIT 15;
+   ```
 
-```
+   This yields:
+
+   ```
+                     station                   | trips
+   ---------------------------------------------+-------
+   Dundas St W / Yonge St                      | 36607
+   Queens Quay / Yonge St                      | 23030
+   Edward St / Yonge St                        | 18280
+   Wellesley St E / Yonge St (Green P)         | 18076
+   Front St W / Yonge St (Hockey Hall of Fame) | 17610
+   Yonge St / Wood St                          | 15248
+   Yonge St / Harbour St                       | 14003
+   Gould St / Yonge St (Ryerson University)    | 13980
+   Toronto Eaton Centre (Yonge St)             | 13263
+   Yonge St / Yorkville Ave                    | 12595
+   Yonge St / Dundonald St - SMART             |  6715
+   Yonge St / Alexander St - SMART             |  6584
+   Marlborough Ave / Yonge St                  |  3872
+   Yonge St / Aylmer Ave                       |  3739
+   Yonge St / Bloor St                         |  1230
+   ```
+
+   It's no surpise that the highest concentration is closer downtown (as can be seen on the query results plotted at https://drive.google.com/open?id=1du9Tz8PVe0Xl2FEpIi2ehkaDre4NV1ML&usp=sharing).
+
+   However, it's worthy of attention that there isn't more activity between Union and Queen St.
+   It's also interesting to see that Bloor/Yonge, being such a significant crossing and combining the 2 TTC lines, sits at 15th place.
