@@ -193,8 +193,9 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
        ```
 
     3. Update `2017 Q3` records
+
        ```
-       UPDATE trips_backup
+       UPDATE trips
        SET
           start_time = (SELECT TO_TIMESTAMP(start_time_str, 'MM/DD/YYYY HH24:MI')),
           end_time = (SELECT TO_TIMESTAMP(end_time_str, 'MM/DD/YYYY HH24:MI'))
@@ -202,20 +203,39 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
        AND start_time_str IS NOT NULL;
        ```
 
+    4. Update `2017 Q4` records
 
-      _For 2017-Q3 - 7/10/2017 0:00_
+       ```
+       UPDATE trips
+       SET
+          start_time = (SELECT TO_TIMESTAMP(start_time_str, 'MM/DD/YY HH24:MI')),
+          end_time = (SELECT TO_TIMESTAMP(end_time_str, 'MM/DD/YY HH24:MI'))
+       WHERE original_filename LIKE '%2017 Q4%'
+       AND start_time_str IS NOT NULL
+       AND id <> 2302635;
+       ```
 
-      - switch `m/dd` to `mm/dd`
+       (While dealing with this, we found that record `2302635` has `end_time_str` of `NULLNULL`, so we'll treat it separately)
 
-      _For 2017-Q4 - 10/01/17 00:00:01_
+       ```
+       UPDATE trips
+       SET
+          start_time = (SELECT TO_TIMESTAMP(start_time_str, 'MM/DD/YY HH24:MI')),
+          end_time_str = NULL
+       WHERE id = 2302635;
+       ```
 
-      - switch `yy` to `yyyy`
-      - switch `hh:mm:ss` to `h:mm`
+    5. Update `2018` records
+       ```
+       UPDATE trips_backup
+       SET
+          start_time = (SELECT TO_TIMESTAMP(start_time_str, 'MM/DD/YYYY HH24:MI')),
+          end_time = (SELECT TO_TIMESTAMP(end_time_str, 'MM/DD/YYYY HH24:MI'))
+       WHERE original_filename LIKE '%2018%'
+       AND start_time_str IS NOT NULL;
+       ```
 
-      _For 2018_
-      - insert as is
-
-3. _**Other than the index in class, would we benefit from any other indexes on this table? Why or why not?**_
+3.  _**Other than the index in class, would we benefit from any other indexes on this table? Why or why not?**_
 
 Yes. An index on `original_filename` goes a long way here.
 It can be perceived by the observing the different `cost` before and after the index:
