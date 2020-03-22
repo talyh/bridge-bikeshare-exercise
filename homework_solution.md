@@ -237,55 +237,55 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
 3.  _**Other than the index in class, would we benefit from any other indexes on this table? Why or why not?**_
 
-Yes. An index on `original_filename` goes a long way here.
-It can be perceived by the observing the different `cost` before and after the index:
+    Yes. An index on `original_filename` goes a long way here.
+    It can be perceived by the observing the different `cost` before and after the index:
 
-```
+    ```
 
-postgres=# EXPLAIN SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
-FROM trips
-GROUP BY original_filename;
-QUERY PLAN
+    postgres=# EXPLAIN SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
+    FROM trips
+    GROUP BY original_filename;
+    QUERY PLAN
 
----
+    ---
 
-GroupAggregate (cost=719052.22..744667.25 rows=8 width=69)
-Group Key: original_filename
--> Sort (cost=719052.22..727590.53 rows=3415324 width=52)
-Sort Key: original_filename
--> Seq Scan on trips (cost=0.00..114957.24 rows=3415324 width=52)
-JIT:
-Functions: 7
-Options: Inlining true, Optimization true, Expressions true, Deforming true
-(8 rows)
+    GroupAggregate (cost=719052.22..744667.25 rows=8 width=69)
+    Group Key: original_filename
+    -> Sort (cost=719052.22..727590.53 rows=3415324 width=52)
+    Sort Key: original_filename
+    -> Seq Scan on trips (cost=0.00..114957.24 rows=3415324 width=52)
+    JIT:
+    Functions: 7
+    Options: Inlining true, Optimization true, Expressions true, Deforming true
+    (8 rows)
 
-```
+    ```
 
-```
+    ```
 
-postgres=# CREATE INDEX idx_original_filename ON trips USING btree (original_filename);
-CREATE INDEX
+    postgres=# CREATE INDEX idx_original_filename ON trips USING btree (original_filename);
+    CREATE INDEX
 
-```
+    ```
 
-```
+    ```
 
-postgres=# EXPLAIN SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
-FROM trips
-GROUP BY original_filename;
-QUERY PLAN
+    postgres=# EXPLAIN SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
+    FROM trips
+    GROUP BY original_filename;
+    QUERY PLAN
 
----
+    ---
 
-GroupAggregate (cost=0.56..343851.30 rows=8 width=69)
-Group Key: original_filename
--> Index Scan using idx_original_filename on trips (cost=0.56..326774.58 rows=3415324 width=52)
-JIT:
-Functions: 5
-Options: Inlining false, Optimization false, Expressions true, Deforming true
-(6 rows)
+    GroupAggregate (cost=0.56..343851.30 rows=8 width=69)
+    Group Key: original_filename
+    -> Index Scan using idx_original_filename on trips (cost=0.56..326774.58 rows=3415324 width=52)
+    JIT:
+    Functions: 5
+    Options: Inlining false, Optimization false, Expressions true, Deforming true
+    (6 rows)
 
-```
+    ```
 
 # Part 3: Data-driven insights
 
