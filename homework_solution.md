@@ -6,21 +6,21 @@
 
    1. Create an index on `from_station_id` and `to_station_id` on `trips` table to help query on those
 
-      ```
+      ```sql
       CREATE INDEX idx_from_station ON trips USING btree (from_station_id);
       ```
 
-      ```
+      ```sql
       CREATE INDEX idx_to_station ON trips USING btree (to_station_id);
       ```
 
    2. Delete the exist `stations` table and recreate it with serial ids, so we can rely on auto-increment. (We could try and alter the table, but that seems to be an involved process, and our table being currently empty, it's easier to just recreate it)
 
-      ```
+      ```sql
       DROP TABLE stations;
       ```
 
-      ```
+      ```sql
       CREATE TABLE stations
       (
          id SERIAL,
@@ -33,31 +33,32 @@
 
    3. Get the first name for stations, assuming that as the correct one where there's more than one, combining the `from` and `to` column results
 
-      ```
-      SELECT from_station_id, (ARRAY_AGG(DISTINCT from_station_name))[1]
+      ```sql
+      SELECT from_station_id, (ARRAY_AGG(DISTINCT from_station_name))
       FROM trips
       WHERE from_station_id IS NOT NULL
       GROUP BY from_station_id
       UNION
-      SELECT from_station_id, (ARRAY_AGG(DISTINCT from_station_name))[1]
+      SELECT to_station_id, (ARRAY_AGG(DISTINCT to_station_name))
       FROM trips
-      WHERE from_station_id IS NOT NULL
-      GROUP BY from_station_id;
+      WHERE to_station_id IS NOT NULL
+      GROUP BY to_station_id
+      LIMIT 10;
       ```
 
    4. Insert into the `stations` table the result of our query
 
-      ```
+      ```sql
       INSERT INTO stations (
          SELECT from_station_id, (ARRAY_AGG(DISTINCT from_station_name))[1]
          FROM trips
          WHERE from_station_id IS NOT NULL
          GROUP BY from_station_id
          UNION
-         SELECT from_station_id, (ARRAY_AGG(DISTINCT from_station_name))[1]
+         SELECT to_station_id, (ARRAY_AGG(DISTINCT to_station_name))[1]
          FROM trips
-         WHERE from_station_id IS NOT NULL
-         GROUP BY from_station_id
+         WHERE to_station_id IS NOT NULL
+         GROUP BY to_station_id
       );
       ```
 
@@ -69,7 +70,7 @@
 
    6. Finally, add entries for records where a name exists, but the id is null, relying on the seqquence to generate an id. This has to be done in 2 steps, so we can exclude the records from the first insertions when we run the second one, avoiding duplicates.
 
-      ```
+      ```sql
       INSERT INTO stations (
          SELECT nextval(pg_get_serial_sequence('stations', 'id')), from_station_name
          FROM trips
@@ -100,7 +101,7 @@
 
    1. We _could_ update the names in `trips`, like so:
 
-      ```
+      ```sql
       UPDATE trips t
       SET
          from_station_name = (SELECT name FROM stations s WHERE t.from_station_id = s.id),
@@ -109,7 +110,7 @@
 
    2. However, it's best to just delete the station names column, so the `stations` table becomes the single source of truth for that (but we won't do that just yet!!)
 
-      ```
+      ```sql
       ALTER TABLE trips_backup
       DROP COLUMN from_station_name,
       DROP COLUMN to_station_name;
@@ -117,7 +118,7 @@
 
    3. Before dropping the columns, we have to populate the station ids columns where they're null
 
-      ```
+      ```sql
       UPDATE trips t
       SET from_station_id = (SELECT id FROM stations s WHERE t.from_station_name = s.name),
       to_station_id  = (SELECT id FROM stations s WHERE t.to_station_name = s.name)
@@ -132,7 +133,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
     There are many. We can examine them by running (this uses the fairly safe assumption of consistency within each of the original csv, so looking at the first record for a given file provides insight into the whole file, and looking into the start date format gives insight into the end date format).
 
-    ```
+    ```sql
     SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
     FROM trips
     GROUP BY original_filename;
@@ -140,7 +141,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
     It gets us the result
 
-    ```
+    ```sql
     original_filename             |     array_agg
     ------------------------------------------+-------------------
     Bikeshare Ridership (2017 Q1).csv        | 10/1/2017 0:03
@@ -170,7 +171,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
     1. Check if there are cases where start time is present without end time or vice-versa. That'll determine whether we can combine updates for both columns or need to run them separately.
 
-       ```
+       ```sql
        SELECT COUNT(*)
        FROM trips
        WHERE
@@ -183,7 +184,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
     2. Update `2017 Q1` and `2017 Q2` records, since they share the same format
 
-       ```
+       ```sql
        UPDATE trips
        SET
           start_time = (SELECT TO_TIMESTAMP(start_time_str, 'DD/MM/YYYY HH24:MI')),
@@ -194,7 +195,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
     3. Update `2017 Q3` records
 
-       ```
+       ```sql
        UPDATE trips
        SET
           start_time = (SELECT TO_TIMESTAMP(start_time_str, 'MM/DD/YYYY HH24:MI')),
@@ -205,7 +206,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
     4. Update `2017 Q4` records
 
-       ```
+       ```sql
        UPDATE trips
        SET
           start_time = (SELECT TO_TIMESTAMP(start_time_str, 'MM/DD/YY HH24:MI')),
@@ -217,7 +218,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
        (While dealing with this, we found that record `2302635` has `end_time_str` of `NULLNULL`, so we'll treat it separately)
 
-       ```
+       ```sql
        UPDATE trips
        SET
           start_time = (SELECT TO_TIMESTAMP(start_time_str, 'MM/DD/YY HH24:MI')),
@@ -226,7 +227,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
        ```
 
     5. Update `2018` records
-       ```
+       ```sql
        UPDATE trips
        SET
           start_time = (SELECT TO_TIMESTAMP(start_time_str, 'MM/DD/YYYY HH24:MI')),
@@ -240,7 +241,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
     Yes. An index on `original_filename` goes a long way here.
     It can be perceived by the observing the different `cost` before and after the index:
 
-    ```
+    ```sql
 
     postgres=# EXPLAIN SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
     FROM trips
@@ -261,14 +262,14 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
     ```
 
-    ```
+    ```sql
 
     postgres=# CREATE INDEX idx_original_filename ON trips USING btree (original_filename);
     CREATE INDEX
 
     ```
 
-    ```
+    ```sql
 
     postgres=# EXPLAIN SELECT original_filename, (ARRAY_AGG(DISTINCT start_time_str))[1]
     FROM trips
@@ -291,7 +292,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
 1. _**Build a mini-report that does a breakdown of number of trips by month**_
 
-   ```
+   ```sql
    SELECT
       CASE  EXTRACT (MONTH FROM start_time)
          WHEN 1 THEN '01 - JAN'
@@ -316,7 +317,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
    This yields:
 
-   ```
+   ```sql
    month   | trips
    ----------+--------
    01 - JAN | 748661
@@ -335,7 +336,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
 2. _**Build a mini-report that does a breakdown of number trips by time of day of their start and end times**_
 
-   ```
+   ```sql
    SELECT EXTRACT (HOUR FROM start_time) as Hour, COUNT(id) Trips
    FROM trips
    GROUP BY Hour
@@ -344,7 +345,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
    This yields:
 
-   ```
+   ```sql
    hour | trips
    ------+--------
       0 |  51963
@@ -375,7 +376,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
 3. _**What are the most popular stations to bike to in the summer?**_
 
-   ```
+   ```sql
    SELECT s.name AS Station, COUNT(t.id) AS Trips
    FROM stations s JOIN trips t
       ON s.id = t.from_station_id
@@ -387,7 +388,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
    This yields:
 
-   ```
+   ```sql
 
                      station                    | trips
    -----------------------------------------------+-------
@@ -405,7 +406,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
 4. _**What are the most popular stations to bike from in the winter?**_
 
-   ```
+   ```sql
    SELECT s.name AS Station, COUNT(t.id) AS Trips
    FROM stations s JOIN trips t
       ON s.id = t.from_station_id
@@ -417,7 +418,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
    This yields:
 
-   ```
+   ```sql
                   station                 | trips
    -----------------------------------------+-------
    Union Station                           | 13764
@@ -436,7 +437,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
    We'll take a look at popular stations to start a journey from, along Yonge St.
 
-   ```
+   ```sql
    SELECT s.name AS Station, COUNT(t.id) AS Trips
    FROM stations s JOIN trips_backup t
       ON s.id = t.from_station_id
@@ -448,7 +449,7 @@ Now all of our `trips` should have stations ids that can be joined on the `stati
 
    This yields:
 
-   ```
+   ```sql
                      station                   | trips
    ---------------------------------------------+-------
    Dundas St W / Yonge St                      | 36607
